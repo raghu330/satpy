@@ -1,3 +1,30 @@
+REGION: IndiaSC {
+        NAME:   IndiaSC
+        PCS_ID: merc_75.0_17.5
+        PCS_DEF:        proj=merc,lat_0=17.5,lon_0=75.0,ellps=WGS84
+        XSIZE:  891
+        YSIZE:  894
+        AREA_EXTENT:    (-3339584.7237982075, -1111475.102852225, 3339584.7237982075, 5591295.918553392)
+};
+
+REGION: IndiaSC5 {
+        NAME:   IndiaSC5
+        PCS_ID: merc_75.0_17.5
+        PCS_DEF:        proj=merc,lat_0=17.5,lon_0=75.0,ellps=WGS84
+        XSIZE:  4453
+        YSIZE:  4469
+        AREA_EXTENT:    (-3339584.7237982075, -1111475.102852225, 3339584.7237982075, 5591295.918553392)
+};
+
+REGION: india {
+        NAME:   india
+        PCS_ID: merc_85.0_20.0
+        PCS_DEF:        proj=merc,lat_0=20.0,lon_0=85.0,ellps=WGS84
+        XSIZE:  1391
+        YSIZE:  1210
+        AREA_EXTENT:    (-2782987.269831842, 7.081154551613622e-10, 2782987.2698318376, 4838471.398061137)
+};
+
 REGION: australia {
 	NAME:	australia
 	PCS_ID:	merc_132.5_-27.5
