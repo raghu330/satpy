@@ -52,6 +52,14 @@ composites:
     - 12.0
     standard_name: night_fog
 
+  dust:
+    compositor: !!python/name:satpy.composites.Dust
+    prerequisites:
+    - 8.7
+    - 10.8
+    - 12.0
+    standard_name: dust
+
   snow:
     compositor: !!python/name:satpy.composites.GenericCompositor
     prerequisites:
