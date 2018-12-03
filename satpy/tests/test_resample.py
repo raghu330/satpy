@@ -33,6 +33,29 @@ except ImportError:
     import mock
 
 
+class TestHLResample(unittest.TestCase):
+    """Test the higher level resampling functions."""
+
+    def test_type_preserve(self):
+        """Check that the type of resampled datasets is preserved."""
+        from satpy.resample import resample_dataset
+        import xarray as xr
+        import dask.array as da
+        import numpy as np
+        from pyresample.geometry import SwathDefinition
+        source_area = SwathDefinition(xr.DataArray(da.arange(4, chunks=5).reshape((2, 2)), dims=['y', 'x']),
+                                      xr.DataArray(da.arange(4, chunks=5).reshape((2, 2)), dims=['y', 'x']))
+        dest_area = SwathDefinition(xr.DataArray(da.arange(4, chunks=5).reshape((2, 2)) + .0001, dims=['y', 'x']),
+                                    xr.DataArray(da.arange(4, chunks=5).reshape((2, 2)) + .0001, dims=['y', 'x']))
+        expected = np.array([[1, 2], [3, 255]])
+        data = xr.DataArray(da.from_array(expected, chunks=5), dims=['y', 'x'])
+        data.attrs['_FillValue'] = 255
+        data.attrs['area'] = source_area
+        res = resample_dataset(data, dest_area)
+        self.assertEqual(res.dtype, data.dtype)
+        self.assertTrue(np.all(res.values == expected))
+
+
 class TestKDTreeResampler(unittest.TestCase):
     """Test the kd-tree resampler."""
 
@@ -221,7 +244,10 @@ class TestEWAResampler(unittest.TestCase):
 
 
 class TestNativeResampler(unittest.TestCase):
+    """Tests for the 'native' resampling method."""
+
     def test_expand_reduce(self):
+        """Test class method 'expand_reduce' basics."""
         from satpy.resample import NativeResampler
         import numpy as np
         import dask.array as da
@@ -245,6 +271,7 @@ class TestNativeResampler(unittest.TestCase):
         self.assertTrue(np.all(new_arr.compute()[::2, :] == n_arr))
 
     def test_expand_dims(self):
+        """Test expanding native resampling with 2D data."""
         from satpy.resample import NativeResampler
         import numpy as np
         import dask.array as da
@@ -273,7 +300,39 @@ class TestNativeResampler(unittest.TestCase):
         new_arr2 = resampler.resample(ds1.compute())
         self.assertTrue(np.all(new_arr == new_arr2))
 
+    def test_expand_dims_3d(self):
+        """Test expanding native resampling with 3D data."""
+        from satpy.resample import NativeResampler
+        import numpy as np
+        import dask.array as da
+        from xarray import DataArray
+        from pyresample.geometry import AreaDefinition
+        from pyresample.utils import proj4_str_to_dict
+        ds1 = DataArray(da.zeros((3, 100, 50), chunks=85), dims=('bands', 'y', 'x'),
+                        coords={'bands': ['R', 'G', 'B'],
+                                'y': da.arange(100, chunks=85),
+                                'x': da.arange(50, chunks=85)})
+        proj_dict = proj4_str_to_dict('+proj=lcc +datum=WGS84 +ellps=WGS84 '
+                                      '+lon_0=-95. +lat_0=25 +lat_1=25 '
+                                      '+units=m +no_defs')
+        target = AreaDefinition(
+            'test',
+            'test',
+            'test',
+            proj_dict,
+            x_size=100,
+            y_size=200,
+            area_extent=(-1000., -1500., 1000., 1500.),
+        )
+        # source geo def doesn't actually matter
+        resampler = NativeResampler(None, target)
+        new_arr = resampler.resample(ds1)
+        self.assertEqual(new_arr.shape, (3, 200, 100))
+        new_arr2 = resampler.resample(ds1.compute())
+        self.assertTrue(np.all(new_arr == new_arr2))
+
     def test_expand_without_dims(self):
+        """Test expanding native resampling with no dimensions specified."""
         from satpy.resample import NativeResampler
         import numpy as np
         import dask.array as da
@@ -300,6 +359,30 @@ class TestNativeResampler(unittest.TestCase):
         new_arr2 = resampler.resample(ds1.compute())
         self.assertTrue(np.all(new_arr == new_arr2))
 
+    def test_expand_without_dims_4D(self):
+        """Test expanding native resampling with 4D data with no dimensions specified."""
+        from satpy.resample import NativeResampler
+        import dask.array as da
+        from xarray import DataArray
+        from pyresample.geometry import AreaDefinition
+        from pyresample.utils import proj4_str_to_dict
+        ds1 = DataArray(da.zeros((2, 3, 100, 50), chunks=85))
+        proj_dict = proj4_str_to_dict('+proj=lcc +datum=WGS84 +ellps=WGS84 '
+                                      '+lon_0=-95. +lat_0=25 +lat_1=25 '
+                                      '+units=m +no_defs')
+        target = AreaDefinition(
+            'test',
+            'test',
+            'test',
+            proj_dict,
+            x_size=100,
+            y_size=200,
+            area_extent=(-1000., -1500., 1000., 1500.),
+        )
+        # source geo def doesn't actually matter
+        resampler = NativeResampler(None, target)
+        self.assertRaises(ValueError, resampler.resample, ds1)
+
 
 def suite():
     """The test suite for test_scene.
@@ -309,6 +392,7 @@ def suite():
     mysuite.addTest(loader.loadTestsFromTestCase(TestNativeResampler))
     mysuite.addTest(loader.loadTestsFromTestCase(TestKDTreeResampler))
     mysuite.addTest(loader.loadTestsFromTestCase(TestEWAResampler))
+    mysuite.addTest(loader.loadTestsFromTestCase(TestHLResample))
 
     return mysuite
 

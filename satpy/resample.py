@@ -756,8 +756,7 @@ class NativeResampler(BaseResampler):
         # convert xarray backed with numpy array to dask array
         if 'x' not in data.dims or 'y' not in data.dims:
             if data.ndim not in [2, 3]:
-                raise ValueError("Can only handle 2D or 3D arrays without "
-                                 "dimensions.")
+                raise ValueError("Can only handle 2D or 3D arrays without dimensions.")
             # assume rows is the second to last axis
             y_axis = data.ndim - 2
             x_axis = data.ndim - 1
@@ -769,17 +768,15 @@ class NativeResampler(BaseResampler):
         in_shape = data.shape
         y_repeats = out_shape[0] / float(in_shape[y_axis])
         x_repeats = out_shape[1] / float(in_shape[x_axis])
-        repeats = {
-            y_axis: y_repeats,
-            x_axis: x_repeats,
-        }
+        repeats = {axis_idx: 1. for axis_idx in range(data.ndim) if axis_idx not in [y_axis, x_axis]}
+        repeats[y_axis] = y_repeats
+        repeats[x_axis] = x_repeats
 
         d_arr = self.expand_reduce(data.data, repeats)
 
         coords = {}
         # Update coords if we can
-        if 'y' in data.coords or 'x' in data.coords and \
-                isinstance(target_geo_def, AreaDefinition):
+        if ('y' in data.coords or 'x' in data.coords) and isinstance(target_geo_def, AreaDefinition):
             coord_chunks = (d_arr.chunks[y_axis], d_arr.chunks[x_axis])
             x_coord, y_coord = target_geo_def.get_proj_vectors_dask(
                 chunks=coord_chunks)
@@ -854,8 +851,15 @@ def resample(source_area, data, destination_area,
     return res
 
 
+def get_fill_value(dataset):
+    """Get the fill value of the *dataset*, defaulting to np.nan."""
+    if np.issubdtype(dataset.dtype, np.integer):
+        return dataset.attrs.get('_FillValue', np.nan)
+    return np.nan
+
+
 def resample_dataset(dataset, destination_area, **kwargs):
-    """Resample the current projectable and return the resampled one.
+    """Resample *dataset* and return the resampled version.
 
     Args:
         dataset (xarray.DataArray): Data to be resampled.
@@ -865,7 +869,8 @@ def resample_dataset(dataset, destination_area, **kwargs):
         **kwargs: The extra parameters to pass to the resampler objects.
 
     Returns:
-        A resampled DataArray with updated ``.attrs["area"]`` field.
+        A resampled DataArray with updated ``.attrs["area"]`` field. The dtype
+        of the array is preserved.
 
     """
     # call the projection stuff here
@@ -877,7 +882,8 @@ def resample_dataset(dataset, destination_area, **kwargs):
 
         return dataset
 
-    new_data = resample(source_area, dataset, destination_area, **kwargs)
+    fill_value = kwargs.pop('fill_value', get_fill_value(dataset))
+    new_data = resample(source_area, dataset, destination_area, fill_value=fill_value, **kwargs)
     new_attrs = new_data.attrs
     new_data.attrs = dataset.attrs.copy()
     new_data.attrs.update(new_attrs)
